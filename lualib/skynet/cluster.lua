@@ -71,7 +71,7 @@ function cluster.send(node, address, ...)
 	if not s then
 		table.insert(task_queue[node], skynet.packstring(address, ...))
 	else
-		skynet.send(sender[node], "lua", "push", address, skynet.pack(...))
+		skynet.send(s, "lua", "push", address, skynet.pack(...))
 	end
 end
 

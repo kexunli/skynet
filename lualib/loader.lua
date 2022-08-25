@@ -47,4 +47,4 @@ end
 
 _G.require = (require "skynet.require").require
 
-main(select(2, table.unpack(args)))
+main(table.unpack(args, 2))
