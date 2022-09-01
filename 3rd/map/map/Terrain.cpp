@@ -11,10 +11,11 @@ extern "C" {
   
 static int CreateSource(lua_State* L)
 {
-    int64 version         = (int64)luaL_checknumber(L, 1);
+    int64 version         = (int64)luaL_checkinteger(L, 1);
     float length          = (float)luaL_checknumber(L, 2);
-    int64 width_count     = (int64)luaL_checknumber(L, 3);
-    int64 height_count    = (int64)luaL_checknumber(L, 4);
+    int64 width_count     = (int64)luaL_checkinteger(L, 3);
+    int64 height_count    = (int64)luaL_checkinteger(L, 4);
+    luaL_checktype(L, 5, LUA_TTABLE);
     uint64 len            = (int64)luaL_len(L, 5);
     if (version <= 0 || length <=0 || width_count <= 0 || height_count <= 0 || (uint64)(width_count * height_count) != len)
     {
@@ -24,11 +25,10 @@ static int CreateSource(lua_State* L)
     grids.reserve(len);
     for (uint64 i = 1; i <= len; ++i)
     {
-        lua_pushnumber(L, i);
-        lua_gettable(L, 5);
-        char grid = (char)luaL_checknumber(L, -1);
-        grids.push_back(grid);
+        lua_geti(L, 5, i);
+        char grid = (char)luaL_checkinteger(L, -1);
         lua_pop(L, 1);
+        grids.push_back(grid);
     }
 
     ITerrain* terrain = new TerrainSource();
