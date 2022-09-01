@@ -19,7 +19,7 @@ public:
     virtual void  SetHeightGridCount(const int64 count) = 0;
 
     virtual const map_grids& GetGridsData() const = 0;
-    virtual void SetGridsData(const char* data, const size_t len) = 0;
+    virtual void SetGridsData(const map_grids& grids) = 0;
     virtual EGridStatus GetGridData(int64 x, int64 y) const = 0;
 };
 
@@ -43,7 +43,7 @@ public:
     virtual void  SetHeightGridCount(const int64 count);
 
     virtual const map_grids& GetGridsData() const;
-    virtual void SetGridsData(const char* data, const size_t len);
+    virtual void SetGridsData(const map_grids& grids);
     virtual EGridStatus GetGridData(int64 x, int64 y) const;
 
 private:

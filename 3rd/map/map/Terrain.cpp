@@ -11,15 +11,24 @@ extern "C" {
   
 static int CreateSource(lua_State* L)
 {
-    size_t len = 0;
     int64 version         = (int64)luaL_checknumber(L, 1);
     float length          = (float)luaL_checknumber(L, 2);
     int64 width_count     = (int64)luaL_checknumber(L, 3);
     int64 height_count    = (int64)luaL_checknumber(L, 4);
-    const char* grid_data = luaL_checklstring(L, 5, &len);
-    if (version <= 0 || length <=0 || width_count <= 0 || height_count <= 0 || (size_t)(width_count * height_count) != len)
+    uint64 len            = (int64)luaL_len(L, 5);
+    if (version <= 0 || length <=0 || width_count <= 0 || height_count <= 0 || (uint64)(width_count * height_count) != len)
     {
         return luaL_error(L, "CreateSource param is invalid");
+    }
+    map_grids grids;
+    grids.reserve(len);
+    for (uint64 i = 1; i <= len; ++i)
+    {
+        lua_pushnumber(L, i);
+        lua_gettable(L, 5);
+        char grid = (char)luaL_checknumber(L, -1);
+        grids.push_back(grid);
+        lua_pop(L, 1);
     }
 
     ITerrain* terrain = new TerrainSource();
@@ -27,7 +36,7 @@ static int CreateSource(lua_State* L)
     terrain->SetGridLength(length);
     terrain->SetWidthGridCount(width_count);
     terrain->SetHeightGridCount(height_count);
-    terrain->SetGridsData(grid_data, len);
+    terrain->SetGridsData(grids);
     
 	lua_pushlightuserdata(L, terrain);
 	return 1;

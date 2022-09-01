@@ -90,15 +90,9 @@ const map_grids& TerrainSource::GetGridsData() const
 }
 
 
-void TerrainSource::SetGridsData(const char* data, const size_t len)
+void TerrainSource::SetGridsData(const map_grids& grids)
 {
-	m_grids.clear();
-	m_grids.reserve(len + 1);
-	for (uint64 i = 0; i < len; ++i)
-	{
-        m_grids.push_back(data[i] - '0');
-
-	}
+	m_grids = grids;
 }
 
 
