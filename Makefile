@@ -53,7 +53,7 @@ update3rd :
 CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet \
   client \
-  bson md5 sproto lpeg $(TLS_MODULE) rapidjson
+  bson md5 sproto lpeg $(TLS_MODULE) rapidjson map
 
 LUA_CLIB_SKYNET = \
   lua-skynet.c lua-seri.c \
@@ -124,6 +124,9 @@ endif
 $(LUA_CLIB_PATH)/rapidjson.so : 3rd/rapidjson/src/rapidjson.cpp 3rd/rapidjson/src/Document.cpp 3rd/rapidjson/src/Schema.cpp 3rd/rapidjson/src/values.cpp | $(LUA_CLIB_PATH)
 	g++ $(CFLAGS) $(SHARED) -I3rd/rapidjson/include -I3rd/rapidjson/src $^ -o $@ $(RAPIDJSON_FLAGS) 
 
+$(LUA_CLIB_PATH)/map.so : 3rd/map/map/IMap.cpp 3rd/map/map/ITerrain.cpp 3rd/map/map/Utils.cpp 3rd/map/map/Terrain.cpp | $(LUA_CLIB_PATH)
+	g++ $(CFLAGS) $(SHARED) -I3rd/map/map  $^ -o $@ 
+  
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so && \
   rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
