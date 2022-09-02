@@ -5,7 +5,7 @@ local __localfuncs = {}
 
 
 ----------------------------
----½âÎöµØÐÎÎÄ¼þ
+---ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 ---@param  path string
 ---@return map_source_data
 map_parser.CreateMapSourceData = function(path)
@@ -28,7 +28,7 @@ end
 
 
 ----------------------------
----»ñÈ¡ÎÄ¼þÃû
+---ï¿½ï¿½È¡ï¿½Ä¼ï¿½ï¿½ï¿½
 ---@param  path string
 ---@return string
 map_parser.GetFileName = function(path)
@@ -114,18 +114,54 @@ __localfuncs.str_to_byte = function(data)
     return bytes
 end
 
-
-
-
+local maps = {}
 local map_data = map_parser.CreateMapSourceData("tile_0.grid")
-print(map_data)
-local map	   = lib.CreateMap(map_data);
-print(map:GetGridLength())
-print(map:GetWidthGridCount())
-print(map:GetHeightGridCount())
-print(map:GridData(1,1))
-print(map:SetGridData(1,1,1))
-print(map:GridData(1,1))
+
+
+local  function test()
+    maps = {}
+    for i=1,100000 do
+	    local map = lib.CreateMap(map_data);
+        map:SetGridData(32,32,0)
+	    -- local map = {[1] =1 }
+        maps[i] = map
+    end
+end
+
+local  function clean()
+    -- for i=1,100000 do
+    --     maps[i] = nil
+    -- end
+    maps = nil
+end
+
+local a
+while true do
+    print("input to begin")
+    a = io.read()
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    print("test count:", collectgarbage("count"))
+    test()
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    print("test end count:", collectgarbage("count"))
+
+    print("input to release")
+    a = io.read()
+    clean()
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    collectgarbage("collect")
+    print("clean end count:", collectgarbage("count"))
+    -- collectgarbage("collect")
+end
+
 
 --local source = terrain_gen.CreateSource(1, 0.5, 5, 5, "0011111111111111111111111")
 --local source = terrain_gen.CreateSource(1, 0.5, 5, 5, {0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1})

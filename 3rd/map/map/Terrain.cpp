@@ -1,7 +1,8 @@
-#include <include/IMap.h>
+#include <include/Map.h>
 #include <include/Define.h>
-#include <include/ITerrain.h>
+#include <include/TerrainData.h>
 #include <string>
+
 extern "C" {
 #include "lua.h"
 #include "lualib.h"
@@ -11,32 +12,27 @@ extern "C" {
   
 static int CreateSource(lua_State* L)
 {
-    int64 version         = (int64)luaL_checkinteger(L, 1);
-    float length          = (float)luaL_checknumber(L, 2);
-    int64 width_count     = (int64)luaL_checkinteger(L, 3);
-    int64 height_count    = (int64)luaL_checkinteger(L, 4);
+    int64 version       = (int64)luaL_checkinteger(L, 1);
+    float length        = (float)luaL_checknumber(L, 2);
+    int64 x_count       = (int64)luaL_checkinteger(L, 3);
+    int64 y_count       = (int64)luaL_checkinteger(L, 4);
     luaL_checktype(L, 5, LUA_TTABLE);
-    uint64 len            = (int64)luaL_len(L, 5);
-    if (version <= 0 || length <=0 || width_count <= 0 || height_count <= 0 || (uint64)(width_count * height_count) != len)
+    uint64 grids_count   = (int64)luaL_len(L, 5);
+    if (version <= 0 || length <=0 || x_count <= 0 || y_count <= 0 || (uint64)(x_count * y_count) != grids_count)
     {
         return luaL_error(L, "CreateSource param is invalid");
     }
-    map_grids grids;
-    grids.reserve(len);
-    for (uint64 i = 1; i <= len; ++i)
+
+    map_grids* p_grids = new map_grids[grids_count];
+    for (uint64 i = 1; i <= grids_count; ++i)
     {
         lua_geti(L, 5, i);
         char grid = (char)luaL_checkinteger(L, -1);
         lua_pop(L, 1);
-        grids.push_back(grid);
+        p_grids[i - 1] = grid;
     }
+    TerrainData* terrain = new TerrainData(version, x_count, y_count, grids_count, length, p_grids);
 
-    ITerrain* terrain = new TerrainSource();
-    terrain->SetVersion(version);
-    terrain->SetGridLength(length);
-    terrain->SetWidthGridCount(width_count);
-    terrain->SetHeightGridCount(height_count);
-    terrain->SetGridsData(grids);
     
 	lua_pushlightuserdata(L, terrain);
 	return 1;
@@ -45,7 +41,7 @@ static int CreateSource(lua_State* L)
 
 static int DestroySource(lua_State* L)
 {
-    ITerrain* p_terrain = (ITerrain*)lua_touserdata(L, 1);
+    TerrainData* p_terrain = (TerrainData*)lua_touserdata(L, 1);
     if (nullptr == p_terrain)
     {
         return luaL_error(L, "DestroySource p_terrain is invalid");
@@ -57,14 +53,16 @@ static int DestroySource(lua_State* L)
 
 static int CreateMap(lua_State* L)
 {
-    ITerrain* p_terrain = (ITerrain*)lua_touserdata(L, 1);
+    TerrainData* p_terrain = (TerrainData*)lua_touserdata(L, 1);
     if (nullptr == p_terrain)
     {
         return luaL_error(L, "CreateMap p_terrain is invalid");
     }
-	new((IMap*)lua_newuserdata(L, sizeof(Map)))Map(p_terrain);
-    luaL_getmetatable(L, MAP_METATABLE);
-    lua_setmetatable(L, -2);
+    IMap* p_map = new Map(p_terrain);
+    //IMap**pp_map = (IMap**)lua_newuserdata(L, sizeof(Map*));
+    //*pp_map = p_map;
+    *(IMap**)lua_newuserdata(L, sizeof(Map*)) = p_map;
+    luaL_setmetatable(L, MAP_METATABLE);
 	return 1;
 }
 

@@ -42,7 +42,7 @@ uint64 BlockToIndex(int64 x, int64 y, int64 width_block_count)
 {
     if (x < 0 || y < 0 || width_block_count < 0)
     {
-        return 0;
+        return ERROR_INDEX;
     }
 
     return (width_block_count * y) + x;

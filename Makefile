@@ -124,7 +124,7 @@ endif
 $(LUA_CLIB_PATH)/rapidjson.so : 3rd/rapidjson/src/rapidjson.cpp 3rd/rapidjson/src/Document.cpp 3rd/rapidjson/src/Schema.cpp 3rd/rapidjson/src/values.cpp | $(LUA_CLIB_PATH)
 	g++ $(CFLAGS) $(SHARED) -I3rd/rapidjson/include -I3rd/rapidjson/src $^ -o $@ $(RAPIDJSON_FLAGS) 
 
-$(LUA_CLIB_PATH)/map.so : 3rd/map/map/IMap.cpp 3rd/map/map/ITerrain.cpp 3rd/map/map/Utils.cpp 3rd/map/map/Terrain.cpp | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/map.so : 3rd/map/map/Map.cpp 3rd/map/map/TerrainData.cpp 3rd/map/map/Utils.cpp 3rd/map/map/Terrain.cpp | $(LUA_CLIB_PATH)
 	g++ $(CFLAGS) $(SHARED) -I3rd/map/map  $^ -o $@ 
   
 clean :

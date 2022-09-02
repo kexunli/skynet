@@ -18,10 +18,10 @@
     <ClCompile Include="Utils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="IMap.cpp">
+    <ClCompile Include="Map.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="ITerrain.cpp">
+    <ClCompile Include="TerrainData.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
@@ -32,10 +32,10 @@
     <ClInclude Include="include\Define.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="include\IMap.h">
+    <ClInclude Include="include\Map.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="include\ITerrain.h">
+    <ClInclude Include="include\TerrainData.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\Utils.h">
