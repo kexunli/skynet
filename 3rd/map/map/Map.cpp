@@ -12,16 +12,19 @@ extern "C" {
 static IMap* GetMap(lua_State* L)
 {
     IMap** p_pmap = (IMap**)lua_touserdata(L, 1);
+    if (p_pmap && *p_pmap)
+    {
+        return *p_pmap;
+    }
     if (nullptr == p_pmap)
     {
         luaL_error(L, "GetMap p_pmap is nullptr");
     }
-    IMap* p_map = *p_pmap;
-    if (nullptr == p_map)
+    else
     {
         luaL_error(L, "GetMap p_map is invalid");
     }
-    return p_map;
+    return nullptr;
 }
 
 Map::Map(TerrainData* terrain)
@@ -103,7 +106,7 @@ bool Map::SetGridData(int64 x, int64 y, EGridStatus block_status)
 
 
 /// ---------------------------------------------------------
-/// lua ·½·¨
+/// lua ï¿½ï¿½ï¿½ï¿½
 /// ---------------------------------------------------------
 static int MapGetVersion(lua_State* L)
 {
