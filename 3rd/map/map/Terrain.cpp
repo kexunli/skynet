@@ -27,12 +27,16 @@ static int CreateSource(lua_State* L)
     for (uint64 i = 1; i <= grids_count; ++i)
     {
         lua_geti(L, 5, i);
-        char grid = (char)luaL_checkinteger(L, -1);
+        int isnum;
+        lua_Integer grid = lua_tointegerx(L, -1, &isnum);
+        if (!isnum || grid < 0 || grid > 255) {
+            delete[] p_grids;
+            return luaL_error(L, "invalid element at pos:%d for argument #5", i);
+        }
         lua_pop(L, 1);
-        p_grids[i - 1] = grid;
+        p_grids[i - 1] = (char)grid;
     }
     TerrainData* terrain = new TerrainData(version, x_count, y_count, grids_count, length, p_grids);
-
     
 	lua_pushlightuserdata(L, terrain);
 	return 1;
