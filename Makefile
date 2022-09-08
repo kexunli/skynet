@@ -15,7 +15,7 @@ LUA_LIB ?= $(LUA_STATICLIB)
 LUA_INC ?= 3rd/lua
 
 $(LUA_STATICLIB) :
-	cd 3rd/lua && $(MAKE) CC='$(CC) -std=gnu99' $(PLAT)
+	cd 3rd/lua && $(MAKE) CC='$(CC) -std=gnu99'
 
 # https : turn on TLS_MODULE to add https support
 
@@ -53,7 +53,7 @@ update3rd :
 CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet \
   client \
-  bson md5 sproto lpeg $(TLS_MODULE) rapidjson map
+  bson md5 sproto lpeg $(TLS_MODULE)
 
 LUA_CLIB_SKYNET = \
   lua-skynet.c lua-seri.c \
@@ -118,18 +118,6 @@ $(LUA_CLIB_PATH)/ltls.so : lualib-src/ltls.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/lpeg.so : 3rd/lpeg/lpcap.c 3rd/lpeg/lpcode.c 3rd/lpeg/lpprint.c 3rd/lpeg/lptree.c 3rd/lpeg/lpvm.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lpeg $^ -o $@ 
 
-#ifeq (linux,$(PLAT))
-#RAPIDJSON_FLAGS += -Wno-class-memaccess -Wno-deprecated-declarations
-#endif
-ifeq (macosx,$(PLAT))
-RAPIDJSON_FLAGS += -Wno-implicit-const-int-float-conversion -Wno-undefined-var-template
-endif
-$(LUA_CLIB_PATH)/rapidjson.so : 3rd/rapidjson/src/rapidjson.cpp 3rd/rapidjson/src/Document.cpp 3rd/rapidjson/src/Schema.cpp 3rd/rapidjson/src/values.cpp | $(LUA_CLIB_PATH)
-	g++ $(CFLAGS) $(SHARED) -I3rd/rapidjson/include -I3rd/rapidjson/src $^ -o $@ $(RAPIDJSON_FLAGS) 
-
-$(LUA_CLIB_PATH)/map.so : 3rd/map/map/Map.cpp 3rd/map/map/TerrainData.cpp 3rd/map/map/Utils.cpp 3rd/map/map/Terrain.cpp | $(LUA_CLIB_PATH)
-	g++ $(CFLAGS) $(SHARED) -I3rd/map/map  $^ -o $@ 
-  
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so && \
   rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
@@ -140,4 +128,3 @@ ifneq (,$(wildcard 3rd/jemalloc/Makefile))
 endif
 	cd 3rd/lua && $(MAKE) clean
 	rm -f $(LUA_STATICLIB)
-
