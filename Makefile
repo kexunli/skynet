@@ -118,8 +118,11 @@ $(LUA_CLIB_PATH)/ltls.so : lualib-src/ltls.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/lpeg.so : 3rd/lpeg/lpcap.c 3rd/lpeg/lpcode.c 3rd/lpeg/lpprint.c 3rd/lpeg/lptree.c 3rd/lpeg/lpvm.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lpeg $^ -o $@ 
 
-ifeq (linux,$(PLATFORM))
-RAPIDJSON_FLAGS += -Wno-class-memaccess -Wno-deprecated-declarations
+#ifeq (linux,$(PLAT))
+#RAPIDJSON_FLAGS += -Wno-class-memaccess -Wno-deprecated-declarations
+#endif
+ifeq (macosx,$(PLAT))
+RAPIDJSON_FLAGS += -Wno-implicit-const-int-float-conversion -Wno-undefined-var-template
 endif
 $(LUA_CLIB_PATH)/rapidjson.so : 3rd/rapidjson/src/rapidjson.cpp 3rd/rapidjson/src/Document.cpp 3rd/rapidjson/src/Schema.cpp 3rd/rapidjson/src/values.cpp | $(LUA_CLIB_PATH)
 	g++ $(CFLAGS) $(SHARED) -I3rd/rapidjson/include -I3rd/rapidjson/src $^ -o $@ $(RAPIDJSON_FLAGS) 
