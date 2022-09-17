@@ -90,9 +90,10 @@ static const char * load_config = "\
 	local current_path = [[.]]..sep\n\
 	local function include(filename)\n\
 		local last_path = current_path\n\
-		local path, name = filename:match([[(.*]]..sep..[[)(.*)$]])\n\
+		local path, name = filename:match([[(.*]]..'[\\\\/]'..[[)(.*)$]])\n\
 		if path then\n\
-			if path:sub(1,1) == sep then	-- root\n\
+			local first = path:sub(1,1)\n\
+			if fisrt == '\\\\' or first == '/' then	-- root\n\
 				current_path = path\n\
 			else\n\
 				current_path = current_path .. path\n\
