@@ -182,6 +182,50 @@ static int os_getenv (lua_State *L) {
   return 1;
 }
 
+//added by xdczju@sina.com
+static int os_optenv (lua_State *L) {
+  const char* env_value = getenv(luaL_checkstring(L, 1));
+  char* env_table;
+  int status;
+  if (lua_gettop(L) < 2) {
+    lua_pushnil(L);
+  } else {
+    lua_settop(L, 2);
+  }
+  
+  if (!env_value)
+    return 1;
+
+  switch (lua_type(L, 2))
+  {
+  case LUA_TNUMBER:
+    lua_stringtonumber(L, env_value);
+    return 1;
+  case LUA_TBOOLEAN:
+    lua_pushboolean(L, strcmp(env_value, "true") == 0);
+    return 1;
+  case LUA_TNIL:
+  case LUA_TSTRING:
+    lua_pushstring(L, env_value);
+    return 1;
+  case LUA_TTABLE:
+    if ((env_table = (char*)calloc(1, strlen(env_value) + 32))) {
+      strcat(env_table, "do return\n");
+      strcat(env_table, env_value);
+      strcat(env_table, "\nend");
+      status = luaL_loadstring(L, env_table) || lua_pcall(L, 0, 1, 0);
+      free((void*)env_table);
+      if (status != LUA_OK) {
+        return lua_error(L);
+      }
+    }
+    return 1;
+  default:
+    return luaL_argerror(L, 2, "unexpected argument type");
+  }
+  return 0;
+}
+
 
 static int os_clock (lua_State *L) {
   lua_pushnumber(L, ((lua_Number)clock())/(lua_Number)CLOCKS_PER_SEC);
@@ -411,6 +455,7 @@ static const luaL_Reg syslib[] = {
   {"execute",   os_execute},
   {"exit",      os_exit},
   {"getenv",    os_getenv},
+  {"optenv",    os_optenv},
   {"remove",    os_remove},
   {"rename",    os_rename},
   {"setlocale", os_setlocale},

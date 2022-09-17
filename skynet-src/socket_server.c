@@ -1925,12 +1925,15 @@ static int
 do_bind(const char *host, int port, int protocol, int *family) {
 	int fd;
 	int status;
-	int reuse = 1;
+	int reuse = 0;
 	struct addrinfo ai_hints;
 	struct addrinfo *ai_list = NULL;
 	char portstr[16];
 	if (host == NULL || host[0] == 0) {
 		host = "0.0.0.0";	// INADDR_ANY
+	} else if (host[0] == '@') {
+		++host;
+		reuse = 1;
 	}
 	sprintf(portstr, "%d", port);
 	memset( &ai_hints, 0, sizeof( ai_hints ) );
@@ -1952,8 +1955,16 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	if (fd < 0) {
 		goto _failed_fd;
 	}
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
-		goto _failed;
+	if (reuse > 0) {
+#if defined SO_REUSEPORT
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (void*)&reuse, sizeof(int)) == -1) {
+			goto _failed;
+		}
+#else
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&reuse, sizeof(int)) == -1) {
+			goto _failed;
+		}
+#endif
 	}
 	status = bind(fd, (struct sockaddr *)ai_list->ai_addr, ai_list->ai_addrlen);
 	if (status != 0)
