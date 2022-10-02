@@ -1,3 +1,4 @@
+#include <stddef.h>
 #define LUA_LIB
 
 #include <string.h>
@@ -596,9 +597,17 @@ decode(const struct sproto_arg *args) {
 static const void *
 getbuffer(lua_State *L, int index, size_t *sz) {
 	const void * buffer = NULL;
+	int isnum = 0;
+	size_t start = 1;
+	size_t tmpsz = 0;
 	int t = lua_type(L, index);
 	if (t == LUA_TSTRING) {
 		buffer = lua_tolstring(L, index, sz);
+		tmpsz = lua_tointegerx(L, index+1, &isnum);
+		if (isnum) {
+			luaL_argcheck(L, tmpsz>=0&&tmpsz<=*sz, index+1, "buffer size out of range");
+			*sz = tmpsz;
+		}
 	} else {
 		if (t != LUA_TUSERDATA && t != LUA_TLIGHTUSERDATA) {
 			luaL_argerror(L, index, "Need a string or userdata");
@@ -606,6 +615,16 @@ getbuffer(lua_State *L, int index, size_t *sz) {
 		}
 		buffer = lua_touserdata(L, index);
 		*sz = luaL_checkinteger(L, index+1);
+	}
+	start = lua_tointegerx(L, index+2, &isnum);
+	if (isnum) {
+		luaL_argcheck(L, start>0&&start<=(*sz+1), index+2, "start pos out of range");
+		if (start <= *sz) {
+			*sz -= start - 1;
+			return buffer + (start - 1);
+		}
+		*sz = 0;
+		return "";
 	}
 	return buffer;
 }
