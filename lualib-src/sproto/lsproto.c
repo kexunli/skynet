@@ -621,7 +621,7 @@ getbuffer(lua_State *L, int index, size_t *sz) {
 		luaL_argcheck(L, start>0&&start<=(*sz+1), index+2, "start pos out of range");
 		if (start <= *sz) {
 			*sz -= start - 1;
-			return buffer + (start - 1);
+			return (const char*)buffer + (start - 1);
 		}
 		*sz = 0;
 		return "";
