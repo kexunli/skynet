@@ -199,6 +199,18 @@ static int os_getenv (lua_State *L) {
 }
 
 //added by xdczju@sina.com
+#ifdef LUA_USE_WINDOWS
+#define put_env(env_k, env_v) _putenv_s(env_k, env_v)
+#else
+#define put_env(env_k, env_v) setenv(env_k, env_v, 1)
+#endif
+
+static int os_setenv (lua_State *L) {
+  lua_pushboolean(L, 0 == put_env(luaL_checkstring(L, 1), luaL_checkstring(L, 2)));
+  return 1;
+}
+
+//added by xdczju@sina.com
 static int os_optenv (lua_State *L) {
   const char* env_value = getenv(luaL_checkstring(L, 1));
   char* env_table;
@@ -469,6 +481,7 @@ static const luaL_Reg syslib[] = {
   {"execute",   os_execute},
   {"exit",      os_exit},
   {"getenv",    os_getenv},
+  {"setenv",    os_setenv},
   {"optenv",    os_optenv},
   {"remove",    os_remove},
   {"rename",    os_rename},
