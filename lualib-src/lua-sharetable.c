@@ -8,6 +8,18 @@
 
 #ifdef makeshared
 
+static int check_any_upvalue(lua_State *L, int idx) {
+	for (int i = 1; lua_getupvalue(L, idx, i); ++i) {
+		if (i >= 2 || !lua_isnoneornil(L, -1)) { //only allow no more than one upvalue and must be nil.
+			lua_pop(L, 1);
+			return 1;
+		} else {
+			lua_pop(L, 1);
+		}
+	}
+	return 0;
+}
+
 static void
 mark_shared(lua_State *L) {
 	if (lua_type(L, -1) != LUA_TTABLE) {
@@ -36,7 +48,7 @@ mark_shared(lua_State *L) {
 			case LUA_TLIGHTUSERDATA:
 				break;
 			case LUA_TFUNCTION:
-				if (lua_getupvalue(L, idx, 1) != NULL) {
+				if (check_any_upvalue(L, idx) != 0) {
 					luaL_error(L, "Invalid function with upvalue");
 				} else if (!lua_iscfunction(L, idx)) {
 					LClosure *f = (LClosure *)lua_topointer(L, idx);
