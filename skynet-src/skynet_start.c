@@ -140,7 +140,7 @@ signal_hup() {
 #include "skynet_env.h"
 static void
 signal_stop() {
-	const char* service = skynet_getenv("start");
+	const char* service = skynet_getenv("stop");
 	if (service == NULL)
 		return;
 
