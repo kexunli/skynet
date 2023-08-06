@@ -33,12 +33,24 @@ struct worker_parm {
 	int weight;
 };
 
+#define SIG_TYPE_HUP    1
+#define SIG_TYPE_STOP   2
+
 static volatile int SIG = 0;
 
 static void
-handle_hup(int signal) {
-	if (signal == SIGHUP) {
-		SIG = 1;
+handle_sig(int signal) {
+	switch (signal)
+	{
+	case SIGHUP:
+		SIG = SIG_TYPE_HUP;
+		break;
+	case SIGINT:
+	case SIGTERM:
+		SIG = SIG_TYPE_STOP;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -125,6 +137,39 @@ signal_hup() {
 	}
 }
 
+#include "skynet_env.h"
+static void
+signal_stop() {
+	const char* service = skynet_getenv("start");
+	if (service == NULL)
+		return;
+
+	struct skynet_message smsg;
+	smsg.source = 0;
+	smsg.session = 0;
+	smsg.data = NULL;
+	smsg.sz = (size_t)PTYPE_SYSTEM << MESSAGE_TYPE_SHIFT;
+	uint32_t handle = skynet_handle_findname(service);
+	if (handle) {
+		skynet_context_push(handle, &smsg);
+	}
+}
+
+static void
+process_sig(int sig) {
+	switch (sig)
+	{
+	case SIG_TYPE_HUP:
+		signal_hup();
+		break;
+	case SIG_TYPE_STOP:
+		signal_stop();
+		break;
+	default:
+		break;
+	}
+}
+
 static void *
 thread_timer(void *p) {
 	struct monitor * m = p;
@@ -136,7 +181,7 @@ thread_timer(void *p) {
 		wakeup(m,m->count-1);
 		usleep(2500);
 		if (SIG) {
-			signal_hup();
+			process_sig(SIG);
 			SIG = 0;
 		}
 	}
@@ -258,10 +303,12 @@ void
 skynet_start(struct skynet_config * config) {
 	// register SIGHUP for log file reopen
 	struct sigaction sa;
-	sa.sa_handler = &handle_hup;
+	sa.sa_handler = &handle_sig;
 	sa.sa_flags = SA_RESTART;
 	sigfillset(&sa.sa_mask);
 	sigaction(SIGHUP, &sa, NULL);
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 
 	if (config->daemon) {
 		if (daemon_init(config->daemon)) {
