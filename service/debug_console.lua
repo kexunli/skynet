@@ -29,35 +29,67 @@ local function format_table(t)
 	return table.concat(result,"\t")
 end
 
-local function dump_line(print, key, value)
+local function dump_line(lines, key, value, format)
 	if type(value) == "table" then
-		print(key, format_table(value))
+		table.insert(lines, string.format(format, key, format_table(value)))
 	else
-		print(key,tostring(value))
+		table.insert(lines, string.format(format, key, tostring(value)))
 	end
 end
 
-local function dump_list(print, list)
+local function dump_list(list)
 	local index = {}
+	local offset = 0
 	for k in pairs(list) do
 		table.insert(index, k)
+		offset = math.max(offset, #tostring(k))
 	end
 	table.sort(index, function(a, b) return tostring(a) < tostring(b) end)
+	local format = "%-"..offset.."s\t%s"
+	local lines = {}
 	for _,v in ipairs(index) do
-		dump_line(print, v, list[v])
+		dump_line(lines, v, list[v], format)
+	end
+	return table.concat(lines, "\r\n")
+end
+
+local function dump_pipeline(print, lines, pipeline)
+	if lines == nil or lines == "" or not pipeline or pipeline == "" then
+		print(lines)
+		return		
+	end
+
+	lines = lines:gsub("\"", "\\\"")
+	local fd = io.popen("echo \"" .. lines .. "\" " .. pipeline, 'r')
+	if not fd then
+		print("Failed to open pipeline")
+		return
+	end
+
+	local result = fd:read("*a")
+    fd:close()
+    if result then
+		print((result:gsub("\r?\n$", "")))
+	else
+		print("Failed to read pipeline")
 	end
 end
 
 local function split_cmdline(cmdline)
-	local split = {}
+	local cmd  = {}
+	local pipe = {}
 	for i in string.gmatch(cmdline, "%S+") do
-		table.insert(split,i)
+		table.insert((i == "|" or #pipe > 0) and pipe or cmd, i)
 	end
-	return split
+	if #pipe == 0 then
+		return cmd, cmdline
+	else
+		return cmd, table.concat(cmd, " "), table.concat(pipe, " ")
+	end
 end
 
 local function docmd(cmdline, print, fd)
-	local split = split_cmdline(cmdline)
+	local split, cmdline, pipeline = split_cmdline(cmdline)
 	local command = split[1]
 	local cmd = COMMAND[command]
 	local ok, list
@@ -70,23 +102,32 @@ local function docmd(cmdline, print, fd)
 			split[1] = cmdline
 			ok, list = pcall(cmd, split)
 		else
-			print("Invalid command, type help for command list")
+			if command and command ~= "" then
+				print("Invalid command, type help for command list")
+			else
+				print()
+			end			
+			return
 		end
 	end
 
 	if ok then
 		if list then
 			if type(list) == "string" then
-				print(list)
+				dump_pipeline(print, list, pipeline)
 			else
-				dump_list(print, list)
+				dump_pipeline(print, dump_list(list), pipeline)
 			end
+		elseif not split.quit then
+			print()
 		end
-		print("<CMD OK>")
+		-- print("<CMD OK>")
 	else
 		print(list)
-		print("<CMD Error>")
+		-- print("<CMD Error>")
 	end
+
+	return split.quit
 end
 
 local function console_main_loop(stdin, print, addr)
@@ -105,8 +146,9 @@ local function console_main_loop(stdin, print, addr)
 				docmd(cmdline, print, stdin)
 				break
 			end
-			if cmdline ~= "" then
-				docmd(cmdline, print, stdin)
+			if cmdline ~= "" and docmd(cmdline, print, stdin) then
+				socket.write(stdin, "Bye!\r\n")
+				break
 			end
 		end
 	end)
@@ -122,15 +164,18 @@ skynet.start(function()
 	skynet.error("Start debug console at " .. ip .. ":" .. port)
 	socket.start(listen_socket , function(id, addr)
 		local function print(...)
-			local t = { ... }
-			for k,v in ipairs(t) do
-				t[k] = tostring(v)
+			local t = table.pack(...)
+			if t.n > 0 then
+				for i = 1, t.n do
+					t[i] = tostring(t[i])
+				end
+				socket.write(id, table.concat(t,"\t"))
+				socket.write(id, "\r\n")
 			end
-			socket.write(id, table.concat(t,"\t"))
-			socket.write(id, "\n")
+			socket.write(id, "#")
 		end
 		socket.start(id)
-		skynet.fork(console_main_loop, id , print, addr)
+		skynet.fork(console_main_loop, id, print, addr)
 	end)
 end)
 
@@ -227,6 +272,8 @@ function COMMAND.list()
 	return skynet.call(".launcher", "lua", "LIST")
 end
 
+COMMAND.ls = COMMAND.list
+
 local function timeout(ti)
 	if ti then
 		ti = tonumber(ti)
@@ -243,8 +290,45 @@ function COMMAND.stat(ti)
 	return skynet.call(".launcher", "lua", "STAT", timeout(ti))
 end
 
-function COMMAND.mem(ti)
-	return skynet.call(".launcher", "lua", "MEM", timeout(ti))
+local function convert_bytes(bytes, humanize)
+    if not bytes then
+        return "unknown"
+    end
+	if humanize == "-h" or humanize == "-H" then
+		if bytes < 1024 then
+			return tostring(bytes) .. " B"
+		end
+		if bytes < 1024 * 1024 then
+			return string.format("%.3f KB", bytes / 1024)
+		end
+		if bytes < 1024 * 1024 * 1024 then
+			return string.format("%.3f MB", bytes / (1024 * 1024))
+		end
+		return string.format("%.3f GB", bytes / (1024 * 1024 * 1024))
+	end
+	if humanize == "-k" or humanize == "-K" then
+		return string.format("%.3f KB", bytes / 1024)
+	end
+	if humanize == "-m" or humanize == "-M" then
+		return string.format("%.3f MB", bytes / (1024 * 1024))
+	end
+	if humanize == "-g" or humanize == "-G" then
+		return string.format("%.3f GB", bytes / (1024 * 1024 * 1024))
+	end
+	return tostring(bytes) .. " B"
+end
+
+function COMMAND.mem(humanize)
+	local list = skynet.call(".launcher", "lua", "MEM", timeout())
+	if type(list) == "table" then
+		local convert = function(kb)
+			return convert_bytes(math.floor(tonumber(kb)*1024), humanize)
+		end
+		for addr, meminfo in pairs(list) do
+			list[addr] = meminfo:gsub("^(%d+%.?%d*) KB", convert, 1)
+		end
+	end
+	return list
 end
 
 function COMMAND.kill(address)
@@ -311,7 +395,10 @@ function COMMANDX.debug(cmd)
 				break
 			end
 			skynet.send(agent, "lua", "cmd", cmdline)
-		until stop or cmdline == "cont"
+			if cmdline == "quit" then
+				cmd.quit = true
+			end
+		until stop or cmdline == "cont" or cmdline == "quit"
 	end
 	skynet.fork(function()
 		pcall(forward_cmd)
@@ -333,6 +420,10 @@ function COMMANDX.debug(cmd)
 	end
 end
 
+function COMMANDX.quit(cmd)
+	cmd.quit = true
+end
+
 function COMMAND.logon(address)
 	address = adjust_address(address)
 	core.command("LOGON", skynet.address(address))
@@ -352,14 +443,14 @@ function COMMAND.signal(address, sig)
 	end
 end
 
-function COMMAND.cmem()
+function COMMAND.cmem(humanize)
 	local info = memory.info()
 	local tmp = {}
 	for k,v in pairs(info) do
-		tmp[skynet.address(k)] = v
+		tmp[skynet.address(k)] = convert_bytes(v, humanize)
 	end
-	tmp.total = memory.total()
-	tmp.block = memory.block()
+	tmp.total = convert_bytes(memory.total(), humanize)
+	tmp.block = convert_bytes(memory.block(), humanize)
 
 	return tmp
 end
@@ -409,19 +500,6 @@ function COMMANDX.call(cmd)
 	return rets
 end
 
-local function bytes(size)
-	if size == nil or size == 0 then
-		return
-	end
-	if size < 1024 then
-		return size
-	end
-	if size < 1024 * 1024 then
-		return tostring(size/1024) .. "K"
-	end
-	return tostring(size/(1024*1024)) .. "M"
-end
-
 local function convert_stat(info)
 	local now = skynet.now()
 	local function time(t)
@@ -441,9 +519,9 @@ local function convert_stat(info)
 	end
 
 	info.address = skynet.address(info.address)
-	info.read = bytes(info.read)
-	info.write = bytes(info.write)
-	info.wbuffer = bytes(info.wbuffer)
+	info.read = convert_bytes(info.read, "-h")
+	info.write = convert_bytes(info.write, "-h")
+	info.wbuffer = convert_bytes(info.wbuffer, "-h")
 	info.rtime = time(info.rtime)
 	info.wtime = time(info.wtime)
 end
@@ -470,3 +548,23 @@ function COMMAND.profactive(flag)
 	local active = memory.profactive()
 	return "heap profilling is ".. (active and "active" or "deactive")
 end
+
+local function convert_time(ts)
+    if not ts then
+        return "unknown"
+    end
+    local day, hour, min, sec = 0, 0, 0, 0
+    day    = math.floor(ts/24/3600)
+    ts     = ts - day * 24*3600
+    hour   = math.floor(ts/3600)
+    ts     = ts - hour * 3600
+    min    = math.floor(ts/60)
+    ts     = ts - min * 60
+    sec    = ts
+    return string.format("%dd %dh %dm %ds", day, hour, min, sec)
+end
+
+function COMMAND.uptime()
+	return string.format("START: %s, UPTIME: %s", os.date('%Y-%m-%d %X', skynet.starttime()), convert_time(math.floor(skynet.now()/100)))
+end
+COMMAND.up = COMMAND.uptime

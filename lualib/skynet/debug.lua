@@ -86,7 +86,7 @@ local function init(skynet, export)
 			local args = table.pack(...)
 			local ok, output = inject(skynet, source, filename, args, export.dispatch, skynet.register_protocol)
 			collectgarbage "collect"
-			skynet.ret(skynet.pack(ok, table.concat(output, "\n")))
+			skynet.ret(skynet.pack(ok, table.concat(output, "\r\n")))
 		end
 
 		function dbgcmd.TERM(service)

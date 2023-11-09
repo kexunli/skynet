@@ -64,7 +64,7 @@ function command.MEM(addr, ti)
 		if type(kb) == "string" then
 			return string.format("%s (%s)", kb, v)
 		else
-			return string.format("%.2f Kb (%s)",kb,v)
+			return string.format("%.3f KB (%s)",kb,v)
 		end
 	end, "MEM")
 end

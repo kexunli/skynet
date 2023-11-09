@@ -12,7 +12,7 @@ local M = {}
 
 local HOOK_FUNC = "raw_dispatch_message"
 local raw_dispatcher
-local print = _G.print
+-- local print = _G.print
 local skynet_suspend
 local skynet_resume
 local prompt
@@ -44,7 +44,7 @@ local function remove_hook(dispatcher)
 	assert(raw_dispatcher, "Not in debug mode")
 	replace_upvalue(dispatcher, HOOK_FUNC, raw_dispatcher)
 	raw_dispatcher = nil
-	print = _G.print
+	-- print = _G.print
 
 	skynet.error "Leave debug mode"
 end
@@ -56,21 +56,28 @@ local function gen_print(fd)
 		for i=1,tmp.n do
 			tmp[i] = tostring(tmp[i])
 		end
-		table.insert(tmp, "\n")
+		table.insert(tmp, "\r\n")
 		socketdriver.send(fd, table.concat(tmp, "\t"))
 	end
 end
 
-local function run_exp(ok, ...)
-	if ok then
-		print(...)
-	end
-	return ok
-end
+-- local function run_exp(ok, ...)
+-- 	if ok then
+-- 		print(...)
+-- 	end
+-- 	return ok
+-- end
+
+-- local function run_cmd(cmd, env, co, level)
+-- 	if not run_exp(injectrun("return "..cmd, co, level, env)) then
+-- 		print(select(2, injectrun(cmd,co, level,env)))
+-- 	end
+-- end
 
 local function run_cmd(cmd, env, co, level)
-	if not run_exp(injectrun("return "..cmd, co, level, env)) then
-		print(select(2, injectrun(cmd,co, level,env)))
+	local status, errmsg = injectrun(cmd,co, level,env)
+	if not status then
+		env.print(errmsg)
 	end
 end
 
@@ -189,10 +196,11 @@ end
 local function hook_dispatch(dispatcher, resp, fd, channel)
 	change_prompt(string.format(":%08x>", skynet.self()))
 
-	print = gen_print(fd)
+	local print = gen_print(fd)
 	local env = {
 		print = print,
-		watch = watch_proto
+		p = print,
+		watch = watch_proto,
 	}
 
 	local watch_env = {
@@ -217,7 +225,7 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 			end
 			local cmd = channel:read()
 			if cmd then
-				if cmd == "cont" then
+				if cmd == "cont" or cmd == "quit" then
 					-- leave debug mode
 					break
 				end
