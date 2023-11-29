@@ -140,6 +140,22 @@ local function init(skynet, export)
 			skynet.ret(skynet.pack(ok, table.concat(output, "\r\n")))
 		end
 
+		function dbgcmd.RELOAD(...)
+            local modules = {}
+            for i = 1, select("#", ...) do
+                local module = select(i, ...)
+				if package.loaded[module] then
+					package.loaded[module] = nil
+					table.insert(modules, module)
+				end
+            end
+			table.sort(modules)
+            for _, module in ipairs(modules) do
+                require(module)
+            end
+			skynet.ret(skynet.pack(table.concat(modules, ", ")))
+		end
+
 		function dbgcmd.TERM(service)
 			skynet.term(service)
 		end

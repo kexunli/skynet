@@ -207,9 +207,12 @@ local function hook_dispatch(dispatcher, resp, dbgenv, channel)
 	-- 	print = print
 	-- }
 
-	local env_meta = { __index = dbgenv }
-	local env = setmetatable({ watch = watch_proto }, env_meta)
-	local watch_env = setmetatable({}, env_meta)
+	local env = { watch = watch_proto }
+	local watch_env = {}
+	for k, v in pairs(dbgenv) do
+		env[k] = v
+		watch_env[k] = v
+	end
 
 	local function watch_cmd(cmd)
 		local co = next(ctx_active)
@@ -224,7 +227,7 @@ local function hook_dispatch(dispatcher, resp, dbgenv, channel)
 	local function debug_hook()
 		while true do
 			if newline then
-				env.puts(prompt)
+				dbgenv.puts(prompt)
 				-- socketdriver.send(fd, prompt)
 				newline = false
 			end

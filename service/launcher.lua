@@ -135,6 +135,10 @@ function command.RUN(addr, ti, pattern, source, filename, ...)
 	end, "RUN", source, filename, ...)
 end
 
+function command.RELOAD(addr, ti, pattern, ...)
+	return list_pat(ti, pattern, true, function(_, err, result) return err or result end, "RELOAD", ...)
+end
+
 function command.REMOVE(_, handle, kill)
 	services[handle] = nil
 	local response = instance[handle]

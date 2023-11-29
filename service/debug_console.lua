@@ -307,6 +307,9 @@ local function adjust_address(address)
 end
 
 local function pattern_address(address)
+	if not address then
+		error("Need an address")
+	end
 	if address == "*" then
 		return "*"
 	end
@@ -415,6 +418,7 @@ end
 function COMMAND.run(address, source, ...)
 	return run(address, source, nil, ...)
 end
+COMMAND.exec = COMMAND.run
 
 function COMMAND.inject(address, filename, ...)
 	local f = io.open(filename, "rb")
@@ -440,6 +444,34 @@ end
 -- 	end
 -- 	return output
 -- end
+
+local function check_modules(...)
+	local modules = {}
+	local count = 0
+	for i = 1, select("#", ...) do
+		local module = select(i, ...)
+		if not module or module == "" then
+			error("Invalid module name: " .. tostring(module))
+		end
+		local path = package.searchpath(module, package.path)
+		if not path then
+			error("Invalid module name: " .. tostring(module))
+		end
+		if modules[path] then
+			error("Duplicate module name: " .. tostring(module))
+		end
+		modules[path] = module
+		count = count + 1
+	end
+	assert(count > 0, "Module name needed")
+end
+
+function COMMAND.reload(address, ...)
+	address = pattern_address(address)
+	check_modules(...)
+	codecache.clear()
+	return skynet.call(".launcher", "lua", "RELOAD", timeout(), address, ...)
+end
 
 function COMMAND.dbgcmd(address, cmd, ...)
 	address = adjust_address(address)
