@@ -22,33 +22,77 @@ function command.LIST()
 	return list
 end
 
-local function list_srv(ti, fmt_func, ...)
+local function format_table(t)
+	local index = {}
+	for k in pairs(t) do
+		table.insert(index, k)
+	end
+	table.sort(index, function(a, b) return tostring(a) < tostring(b) end)
+	local result = {}
+	for _,v in ipairs(index) do
+		table.insert(result, string.format("%s:%s",v,tostring(t[v])))
+	end
+	return table.concat(result," ")
+end
+
+local function show_func(show_fmt, addr, result)
+	local result_s = type(result) == "table" and format_table(result) or tostring(result)
+	if show_fmt then
+		return string.format(show_fmt, tostring(services[addr]), result_s)
+	else
+		return result_s 
+	end
+end
+
+local function list_srv(ti, svcs, show_svc, fmt_func, ...)
 	local list = {}
 	local sessions = {}
 	local req = skynet.request()
-	for addr in pairs(services) do
+	local svc_offset = 0
+	for addr, service in pairs(svcs) do
 		local r = { addr, "debug", ... }
 		req:add(r)
 		sessions[r] = addr
+		svc_offset = math.max(svc_offset, #tostring(service))
 	end
+	local show_fmt = show_svc and "%-"..svc_offset.."s\t%s" or nil
 	for req, resp in req:select(ti) do
 		local addr = req[1]
 		if resp then
-			local stat = resp[1]
-			list[skynet.address(addr)] = fmt_func(stat, addr)
+			list[skynet.address(addr)] = show_func(show_fmt, addr, fmt_func(addr, nil, table.unpack(resp, 1, resp.n)))
 		else
-			list[skynet.address(addr)] = fmt_func("ERROR", addr)
+			list[skynet.address(addr)] = show_func(show_fmt, addr, fmt_func(addr, "ERROR"))
 		end
 		sessions[req] = nil
 	end
 	for session, addr in pairs(sessions) do
-		list[skynet.address(addr)] = fmt_func("TIMEOUT", addr)
+		list[skynet.address(addr)] = show_func(show_fmt, addr, fmt_func(addr, "TIMEOUT"))
 	end
 	return list
 end
 
-function command.STAT(addr, ti)
-	return list_srv(ti, function(v) return v end, "STAT")
+local function select_pat(pattern)
+	local svcs = {}
+	local pattern_s = pattern and "^"..pattern.."$" or nil
+	for addr, service in pairs(services) do
+		if not pattern_s or string.find(service, pattern_s) then
+			svcs[addr] = service
+		end
+	end
+	return svcs
+end
+
+local function list_pat(ti, pattern, show_svc, fmt_func, ...)
+	local handle = tonumber(pattern)
+	if handle then
+		return list_srv(ti, { [handle] = tostring(services[handle]) }, show_svc, fmt_func, ...)
+	elseif pattern then
+		return list_srv(ti, pattern == "*" and services or select_pat(pattern), show_svc, fmt_func, ...)
+	end
+end
+
+function command.STAT(addr, ti, pattern)
+	return list_pat(ti, pattern, true, function(_, err, stat) return err or stat end, "STAT")
 end
 
 function command.KILL(_, handle)
@@ -59,21 +103,36 @@ function command.KILL(_, handle)
 end
 
 function command.MEM(addr, ti)
-	return list_srv(ti, function(kb, addr)
-		local v = services[addr]
-		if type(kb) == "string" then
-			return string.format("%s (%s)", kb, v)
-		else
-			return string.format("%.3f KB (%s)",kb,v)
-		end
+	return list_srv(ti, services, true, function(addr, err, kb)
+		return err or string.format("%.3f KB", kb)
 	end, "MEM")
 end
 
-function command.GC(addr, ti)
-	for k,v in pairs(services) do
-		skynet.send(k,"debug","GC")
-	end
-	return command.MEM(addr, ti)
+-- function command.GC(addr, ti)
+-- 	for k,v in pairs(services) do
+-- 		skynet.send(k,"debug","GC")
+-- 	end
+-- 	return command.MEM(addr, ti)
+-- end
+
+function command.GC(addr, ti, pattern)
+	return list_pat(ti, pattern, true, function(addr, err, kb_before, kb_after, cost_sec)
+		return err or string.format("%.3f KB <- %.3f KB, %.2f sec", kb_after, kb_before, cost_sec)
+	end, "GC")
+end
+
+function command.INFO(addr, ti, pattern, ...)
+	return list_pat(ti, pattern, true, function(_, err, info) return err or info end, "INFO", ...)
+end
+
+function command.RUN(addr, ti, pattern, source, filename, ...)
+	return list_pat(ti, pattern, true, function(_, err, ok, output)
+		if err then
+			return err
+		end
+		local msg = type(output) == "table" and format_table(output) or tostring(output)
+		return (ok and "OK" or "ERROR") .. "\t" .. msg
+	end, "RUN", source, filename, ...)
 end
 
 function command.REMOVE(_, handle, kill)

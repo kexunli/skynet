@@ -49,17 +49,17 @@ local function remove_hook(dispatcher)
 	skynet.error "Leave debug mode"
 end
 
-local function gen_print(fd)
-	-- redirect print to socket fd
-	return function(...)
-		local tmp = table.pack(...)
-		for i=1,tmp.n do
-			tmp[i] = tostring(tmp[i])
-		end
-		table.insert(tmp, "\r\n")
-		socketdriver.send(fd, table.concat(tmp, "\t"))
-	end
-end
+-- local function gen_print(fd)
+-- 	-- redirect print to socket fd
+-- 	return function(...)
+-- 		local tmp = table.pack(...)
+-- 		for i=1,tmp.n do
+-- 			tmp[i] = tostring(tmp[i])
+-- 		end
+-- 		table.insert(tmp, "\r\n")
+-- 		socketdriver.send(fd, table.concat(tmp, "\t"))
+-- 	end
+-- end
 
 -- local function run_exp(ok, ...)
 -- 	if ok then
@@ -193,19 +193,23 @@ function dbgcmd.c(co)
 	skynet_suspend(co, skynet_resume(co))
 end
 
-local function hook_dispatch(dispatcher, resp, fd, channel)
+local function hook_dispatch(dispatcher, resp, dbgenv, channel)
 	change_prompt(string.format(":%08x>", skynet.self()))
 
-	local print = gen_print(fd)
-	local env = {
-		print = print,
-		p = print,
-		watch = watch_proto,
-	}
+	-- local print = gen_print(fd)
+	-- local env = {
+	-- 	print = print,
+	-- 	p = print,
+	-- 	watch = watch_proto,
+	-- }
 
-	local watch_env = {
-		print = print
-	}
+	-- local watch_env = {
+	-- 	print = print
+	-- }
+
+	local env_meta = { __index = dbgenv }
+	local env = setmetatable({ watch = watch_proto }, env_meta)
+	local watch_env = setmetatable({}, env_meta)
 
 	local function watch_cmd(cmd)
 		local co = next(ctx_active)
@@ -220,7 +224,8 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 	local function debug_hook()
 		while true do
 			if newline then
-				socketdriver.send(fd, prompt)
+				env.puts(prompt)
+				-- socketdriver.send(fd, prompt)
 				newline = false
 			end
 			local cmd = channel:read()
@@ -265,14 +270,14 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 	return func
 end
 
-function M.start(import, fd, handle)
+function M.start(import, env, handle)
 	local dispatcher = import.dispatch
 	skynet_suspend = import.suspend
 	skynet_resume = import.resume
 	assert(raw_dispatcher == nil, "Already in debug mode")
 	skynet.error "Enter debug mode"
 	local channel = debugchannel.connect(handle)
-	raw_dispatcher = hook_dispatch(dispatcher, skynet.response(), fd, channel)
+	raw_dispatcher = hook_dispatch(dispatcher, skynet.response(), env, channel)
 end
 
 return M

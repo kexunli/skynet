@@ -26,7 +26,7 @@ local function format_table(t)
 	for _,v in ipairs(index) do
 		table.insert(result, string.format("%s:%s",v,tostring(t[v])))
 	end
-	return table.concat(result,"\t")
+	return table.concat(result," ")
 end
 
 local function dump_line(lines, key, value, format)
@@ -75,21 +75,59 @@ local function dump_pipeline(print, lines, pipeline)
 	end
 end
 
+local bracket_l = ('['):byte(1)
+local quotation_s = ("'"):byte(1)
+local quotation_d = ('"'):byte(1)
+local vertical = ('|'):byte(1)
+
+---@param cmdline string
+---@return string[]|nil, string|nil, string|nil
 local function split_cmdline(cmdline)
-	local cmd  = {}
-	local pipe = {}
-	for i in string.gmatch(cmdline, "%S+") do
-		table.insert((i == "|" or #pipe > 0) and pipe or cmd, i)
+	cmdline = cmdline:gsub("^%s*(.-)%s*$", "%1")
+	if cmdline == "" or not cmdline:match("^%a") then
+		return { cmdline }
 	end
-	if #pipe == 0 then
-		return cmd, cmdline
-	else
-		return cmd, table.concat(cmd, " "), table.concat(pipe, " ")
+
+	local cmd = {}
+	local pos = 1
+	while true do
+		local s = cmdline:find("%S", pos)
+		if not s then
+			return cmd
+		end
+		local b1, b2 = cmdline:byte(s, s + 1)
+		if (b1 == bracket_l and b2 == bracket_l) or b1 == quotation_s or b1 == quotation_d then
+			local m = (b1 == bracket_l and b2 == bracket_l) and "]]" or string.char(b1)
+			local e = cmdline:find(m, s + #m, true)
+			if e then
+				table.insert(cmd, cmdline:sub(s + #m, e - 1))
+				pos = e + #m
+			else
+				return nil, nil, "Invalid arguments, missing " .. m
+			end	
+		elseif b1 == vertical then -- and (not b2 or string.char(b2):match("%s")) then
+			return cmd, cmdline:sub(s) --Warning: pipeline conntains |
+		else
+			local e1, e2, token = cmdline:find("^(%S*)", s)
+			local e3 = token:find('|', 1, true)
+			if e3 then
+				table.insert(cmd, token:sub(1, e3 - 1))
+				return cmd, cmdline:sub(e1 + e3 - 1)  --Warning: pipeline conntains |
+			else
+				table.insert(cmd, token)
+				pos = e2 + 1
+			end
+		end
 	end
 end
 
 local function docmd(cmdline, print, fd)
-	local split, cmdline, pipeline = split_cmdline(cmdline)
+	local split, pipeline, errmsg = split_cmdline(cmdline)
+	if errmsg then
+		print(errmsg)
+		return
+	end
+
 	local command = split[1]
 	local cmd = COMMAND[command]
 	local ok, list
@@ -99,7 +137,7 @@ local function docmd(cmdline, print, fd)
 		cmd = COMMANDX[command]
 		if cmd then
 			split.fd = fd
-			split[1] = cmdline
+			-- split[1] = cmdline
 			ok, list = pcall(cmd, split)
 		else
 			if command and command ~= "" then
@@ -268,6 +306,21 @@ local function adjust_address(address)
 	return address
 end
 
+local function pattern_address(address)
+	if address == "*" then
+		return "*"
+	end
+	local prefix = address:sub(1,1)
+	if prefix == 's' and address:sub(1, 5) == "snlua" then
+		return address
+	end
+	if prefix == '.' then
+		return assert(skynet.localname(address), "Not a valid name")
+	else
+		return assert(tonumber(prefix == ':' and address:sub(2) or address, 16), "Need an address") | (skynet.harbor(skynet.self()) << 24)
+	end
+end
+
 function COMMAND.list()
 	return skynet.call(".launcher", "lua", "LIST")
 end
@@ -286,8 +339,12 @@ local function timeout(ti)
 	return ti
 end
 
-function COMMAND.stat(ti)
-	return skynet.call(".launcher", "lua", "STAT", timeout(ti))
+-- function COMMAND.stat(ti)
+-- 	return skynet.call(".launcher", "lua", "STAT", timeout(ti))
+-- end
+
+function COMMAND.stat(address)
+	return skynet.call(".launcher", "lua", "STAT", timeout(), pattern_address(address or "*"))
 end
 
 local function convert_bytes(bytes, humanize)
@@ -318,45 +375,71 @@ local function convert_bytes(bytes, humanize)
 	return tostring(bytes) .. " B"
 end
 
-function COMMAND.mem(humanize)
-	local list = skynet.call(".launcher", "lua", "MEM", timeout())
+local function convert_mem_list(list, humanize)
 	if type(list) == "table" then
 		local convert = function(kb)
 			return convert_bytes(math.floor(tonumber(kb)*1024), humanize)
 		end
 		for addr, meminfo in pairs(list) do
-			list[addr] = meminfo:gsub("^(%d+%.?%d*) KB", convert, 1)
+			list[addr] = meminfo:gsub("(%d+%.?%d*) KB", convert)
 		end
 	end
 	return list
+end
+
+function COMMAND.mem(humanize)
+	local list = skynet.call(".launcher", "lua", "MEM", timeout())
+	return convert_mem_list(list, humanize)
 end
 
 function COMMAND.kill(address)
 	return skynet.call(".launcher", "lua", "KILL", adjust_address(address))
 end
 
-function COMMAND.gc(ti)
-	return skynet.call(".launcher", "lua", "GC", timeout(ti))
+function COMMAND.gc(address, humanize)
+	if address and address:byte(1) == ('-'):byte(1) then
+		address, humanize = humanize, address
+	end
+	local list = skynet.call(".launcher", "lua", "GC", timeout(3000), pattern_address(address or "*"))
+	return convert_mem_list(list, humanize)
 end
 
 function COMMAND.exit(address)
 	skynet.send(adjust_address(address), "debug", "EXIT")
 end
 
+local function run(address, source, filename, ...)
+	return skynet.call(".launcher", "lua", "RUN", timeout(), pattern_address(address), source, filename, ...)
+end
+
+function COMMAND.run(address, source, ...)
+	return run(address, source, nil, ...)
+end
+
 function COMMAND.inject(address, filename, ...)
-	address = adjust_address(address)
 	local f = io.open(filename, "rb")
 	if not f then
 		return "Can't open " .. filename
 	end
 	local source = f:read "*a"
 	f:close()
-	local ok, output = skynet.call(address, "debug", "RUN", source, filename, ...)
-	if ok == false then
-		error(output)
-	end
-	return output
+	return run(address, source, filename, ...)	
 end
+
+-- function COMMAND.inject(address, filename, ...)
+-- 	address = adjust_address(address)
+-- 	local f = io.open(filename, "rb")
+-- 	if not f then
+-- 		return "Can't open " .. filename
+-- 	end
+-- 	local source = f:read "*a"
+-- 	f:close()
+-- 	local ok, output = skynet.call(address, "debug", "RUN", source, filename, ...)
+-- 	if ok == false then
+-- 		error(output)
+-- 	end
+-- 	return output
+-- end
 
 function COMMAND.dbgcmd(address, cmd, ...)
 	address = adjust_address(address)
@@ -376,7 +459,8 @@ function COMMAND.uniqtask(address)
 end
 
 function COMMAND.info(address, ...)
-	return COMMAND.dbgcmd(address, "INFO", ...)
+	-- return COMMAND.dbgcmd(address, "INFO", ...)
+	return skynet.call(".launcher", "lua", "INFO", timeout(), pattern_address(address or "*"), ...)
 end
 
 function COMMANDX.debug(cmd)
@@ -488,10 +572,24 @@ function COMMAND.trace(address, proto, flag)
 	skynet.call(address, "debug", "TRACELOG", proto, flag)
 end
 
-function COMMANDX.call(cmd)
-	local address = adjust_address(cmd[2])
-	local cmdline = assert(cmd[1]:match("%S+%s+%S+%s(.+)") , "need arguments")
-	local args_func = assert(load("return " .. cmdline, "debug console", "t", {}), "Invalid arguments")
+-- function COMMANDX.call(cmd)
+-- 	local address = adjust_address(cmd[2])
+-- 	local cmdline = assert(cmd[1]:match("%S+%s+%S+%s(.+)") , "need arguments")
+-- 	local args_func = assert(load("return " .. cmdline, "debug console", "t", {}), "Invalid arguments")
+-- 	local args = table.pack(pcall(args_func))
+-- 	if not args[1] then
+-- 		error(args[2])
+-- 	end
+-- 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
+-- 	return rets
+-- end
+
+function COMMANDX.call(address, params)
+	local address = adjust_address(address)
+	if not params or #params == 0 then
+		error("Need arguments for call")
+	end
+	local args_func = assert(load("return " .. params, "debug console", "t", {}), "Invalid arguments")
 	local args = table.pack(pcall(args_func))
 	if not args[1] then
 		error(args[2])

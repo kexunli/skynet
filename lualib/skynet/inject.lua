@@ -18,21 +18,23 @@ local function getupvaluetable(u, func, unique)
 	end
 end
 
-return function(skynet, source, filename, args, ...)
+return function(skynet, dbgenv, source, filename, args, ...)
 	if filename then
 		filename = "@" .. filename
 	else
 		filename = "=(load)"
 	end
-	local output = {}
+	
+	-- local output = {}
 
-	local function print(...)
-		local value = { ... }
-		for k,v in ipairs(value) do
-			value[k] = tostring(v)
-		end
-		table.insert(output, table.concat(value, "\t"))
-	end
+	-- local function print(...)
+	-- 	local value = { ... }
+	-- 	for k,v in ipairs(value) do
+	-- 		value[k] = tostring(v)
+	-- 	end
+	-- 	table.insert(output, table.concat(value, "\t"))
+	-- end
+
 	local u = {}
 	local unique = {}
 	local funcs = { ... }
@@ -51,16 +53,20 @@ return function(skynet, source, filename, args, ...)
 			end
 		end
 	end
-	local env = setmetatable( { print = print , _U = u, _P = p}, { __index = _ENV })
+	
+	local env = setmetatable({ _U = u, _P = p }, { __index = dbgenv })
 	local func, err = load(source, filename, "bt", env)
 	if not func then
-		return false, { err }
+		return false, err
 	end
-	local ok, err = skynet.pcall(func, table.unpack(args, 1, args.n))
-	if not ok then
-		table.insert(output, err)
-		return false, output
-	end
+	return skynet.pcall(func, table.unpack(args, 1, args.n))
 
-	return true, output
+	-- local ok, err = skynet.pcall(func, table.unpack(args, 1, args.n))
+	-- if not ok then
+	-- 	table.insert(output, err)
+	-- 	return false, output
+	-- end
+
+	-- return true, output
 end
+ 

@@ -117,7 +117,7 @@ skynet.start(function()
 			info[skynet.address(v.address)] = {
 				init = v.init,
 				name = k,
-				time = os.date("%Y %b %d %T %z",math.floor(v.time)),
+				time = os.date("%Y %b %d %X", math.floor(v.time)),
 				status = status,
 			}
 		end

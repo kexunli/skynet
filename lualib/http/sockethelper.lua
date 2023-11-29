@@ -5,9 +5,15 @@ local readbytes = socket.read
 local writebytes = socket.write
 
 local sockethelper = {}
-local socket_error = setmetatable({} , { __tostring = function() return "[Socket Error]" end })
+local socket_error = setmetatable({} , { __tostring = function(t) return "[Socket Error]: "..(t.errmsg or "") end })
 
 sockethelper.socket_error = socket_error
+
+---@param msg string
+local function _error(msg)
+	socket_error.errmsg = tostring(msg)
+	error(socket_error)
+end
 
 local function preread(fd, str)
 	return function (sz)
@@ -27,7 +33,7 @@ local function preread(fd, str)
 					if ret then
 						return str .. ret
 					else
-						error(socket_error)
+						_error("read failed")
 					end
 				end
 			end
@@ -36,7 +42,7 @@ local function preread(fd, str)
 			if ret then
 				return ret
 			else
-				error(socket_error)
+				_error("read failed")
 			end
 		end
 	end
@@ -51,7 +57,7 @@ function sockethelper.readfunc(fd, pre)
 		if ret then
 			return ret
 		else
-			error(socket_error)
+			_error("read failed")
 		end
 	end
 end
@@ -62,19 +68,19 @@ function sockethelper.writefunc(fd)
 	return function(content)
 		local ok = writebytes(fd, content)
 		if not ok then
-			error(socket_error)
+			_error("write failed")
 		end
 	end
 end
 
 function sockethelper.connect(host, port, timeout)
-	local fd
+	local fd, errmsg
 	if timeout then
 		local drop_fd
 		local co = coroutine.running()
 		-- asynchronous connect
 		skynet.fork(function()
-			fd = socket.open(host, port)
+			fd, errmsg = socket.open(host, port)
 			if drop_fd then
 				-- sockethelper.connect already return, and raise socket_error
 				socket.close(fd)
@@ -87,15 +93,16 @@ function sockethelper.connect(host, port, timeout)
 		if not fd then
 			-- not connect yet
 			drop_fd = true
+			errmsg = errmsg or "timeout"
 		end
 	else
 		-- block connect
-		fd = socket.open(host, port)
+		fd, errmsg = socket.open(host, port)
 	end
 	if fd then
 		return fd
 	end
-	error(socket_error)
+	_error(errmsg)
 end
 
 function sockethelper.close(fd)
