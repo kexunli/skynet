@@ -505,7 +505,8 @@ function COMMANDX.debug(cmd)
 			-- notice :  It's a bad practice to call socket.readline from two threads (this one and console_main_loop), be careful.
 			skynet.call(agent, "lua", "ping")	-- detect agent alive, if agent exit, raise error
 			local cmdline = socket.readline(cmd.fd, "\n")
-			cmdline = cmdline and cmdline:gsub("(.*)\r$", "%1")
+			-- cmdline = cmdline and cmdline:gsub("(.*)\r$", "%1")
+			cmdline = cmdline and cmdline:gsub("^%s*(.-)%s*$", "%1")
 			if not cmdline then
 				skynet.send(agent, "lua", "cmd", "cont")
 				break

@@ -74,8 +74,27 @@ end
 -- 	end
 -- end
 
+local keywords = { "do", "for", "function", "if", "local", "repeat", "return", "while", }
+local function is_keyword(cmd)
+	for _, word in ipairs(keywords) do
+		if cmd == word then
+			return true
+		end
+	end
+	return false
+end
+
+local function adj_cmd(cmd)
+	local s, e, func, nextc = cmd:find("^(_*%a[%w_]*)%s*(.?)")
+	if func and not is_keyword(func) and nextc ~= "(" and nextc ~= "." and nextc ~= ":" and nextc ~= "," and nextc ~= "=" then
+		return string.format("%s(%s)", cmd:sub(1, e - #nextc), cmd:sub(e - #nextc + 1))
+	else
+		return cmd
+	end
+end
+
 local function run_cmd(cmd, env, co, level)
-	local status, errmsg = injectrun(cmd,co, level,env)
+	local status, errmsg = injectrun(adj_cmd(cmd),co, level,env)
 	if not status then
 		env.print(errmsg)
 	end
