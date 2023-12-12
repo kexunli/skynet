@@ -221,40 +221,49 @@ function COMMAND.help()
 	return {
 		help = "This help message",
 		list = "List all the service",
-		stat = "Dump all stats",
-		info = "info address : get service infomation",
+		ls = "List all the service",
+		stat = "stat [address|pattern] : dump service stats, default for all",
+		info = "info [address|pattern] : get service infomation, default for all",
 		exit = "exit address : kill a lua service",
 		kill = "kill address : kill service",
-		mem = "mem : show memory status",
-		gc = "gc : force every lua service do garbage collect",
+		mem = "mem [-h|-b|-k|-m|-g] : show memory status",
+		gc = "gc [-h|-b|-k|-m|-g] [address|pattern] : force service do garbage collect, default for all",
 		start = "lanuch a new lua service",
 		snax = "lanuch a new snax service",
 		clearcache = "clear lua code cache",
+		cc = "clear lua code cache",
 		service = "List unique service",
 		task = "task address : show service task detail",
 		uniqtask = "task address : show service unique task detail",
-		inject = "inject address luascript.lua",
+		inject = "inject address|pattern luascript.lua",
+		run = "run address|pattern [[luascript]]",
+		exec = "exec address|pattern [[luascript]]",
+		reload = "reload address|pattern module [...]",
 		logon = "logon address",
 		logoff = "logoff address",
 		log = "launch a new lua service with log",
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
-		cmem = "Show C memory info",
+		cmem = "cmem [-h|-b|-k|-m|-g] : Show C memory info",
 		jmem = "Show jemalloc mem stats",
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
 		netstat = "netstat : show netstat",
-		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
-		dumpheap = "dumpheap : dump heap profilling",
+		profactive = "profactive [on|off] : active/deactive jemalloc heap profiling",
+		dumpheap = "dumpheap : dump heap profiling",
 		killtask = "killtask address threadname : threadname listed by task",
 		dbgcmd = "run address debug command",
+		uptime = "Show start time and uptime",
+		up = "Show start time and uptime",
 	}
 end
 
 function COMMAND.clearcache()
 	codecache.clear()
 end
+
+COMMAND.cc = COMMAND.clearcache
 
 function COMMAND.start(...)
 	local ok, addr = pcall(skynet.newservice, ...)
@@ -469,7 +478,7 @@ end
 function COMMAND.reload(address, ...)
 	address = pattern_address(address)
 	check_modules(...)
-	codecache.clear()
+	-- codecache.clear()
 	return skynet.call(".launcher", "lua", "RELOAD", timeout(), address, ...)
 end
 
@@ -677,7 +686,7 @@ function COMMAND.profactive(flag)
 		memory.profactive(flag)
 	end
 	local active = memory.profactive()
-	return "heap profilling is ".. (active and "active" or "deactive")
+	return "heap profiling is ".. (active and "active" or "deactive")
 end
 
 local function convert_time(ts)
